@@ -1,0 +1,121 @@
+name: CI/CD with Self-Hosted Runner
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "18"
+
+jobs:
+  test:
+    runs-on: self-hosted
+
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: test_admin
+          POSTGRES_PASSWORD: test_1234
+          POSTGRES_DB: test_lab4_1
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          sudo npm install -g jest
+
+      - name: Wait for PostgreSQL
+        run: |
+          echo "Waiting for PostgreSQL..."
+          timeout 60s bash -c 'until pg_isready -h localhost -p 5432; do sleep 2; done'
+
+      - name: Run unit tests
+        run: npm run test:unit
+        env:
+          NODE_ENV: test
+          DB_HOST: localhost
+          DB_USER: test_admin
+          DB_PASSWORD: test_1234
+          DB_NAME: test_lab4_1
+
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          NODE_ENV: test
+          DB_HOST: localhost
+          DB_USER: test_admin
+          DB_PASSWORD: test_1234
+          DB_NAME: test_lab4_1
+
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
+  deploy:
+    runs-on: self-hosted
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Stop existing containers
+        run: |
+          docker-compose -f docker-compose.prod.yml down || true
+
+      - name: Build and start containers
+        run: |
+          docker-compose -f docker-compose.prod.yml build
+          docker-compose -f docker-compose.prod.yml up -d
+
+      - name: Wait for application to start
+        run: |
+          echo "Waiting for application to start..."
+          timeout 120s bash -c 'until curl -f http://localhost:8080/api/test/all; do sleep 5; done'
+
+      - name: Run health checks
+        run: |
+          echo "Running health checks..."
+          curl -f http://localhost:8080/ || exit 1
+          curl -f http://localhost:8080/api/test/all || exit 1
+          echo "All health checks passed!"
+
+      - name: Log deployment info
+        run: |
+          echo "Deployment completed successfully!"
+          echo "Application URL: http://localhost:8080"
+          echo "Deployment time: $(date)"
+          echo "Commit: ${{ github.sha }}"

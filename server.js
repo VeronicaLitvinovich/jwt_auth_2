@@ -5,26 +5,30 @@ const cookieParser = require("cookie-parser");
 const app = express();
 
 let corsOptions = {
-  origin: "http://localhost:8081",
-  credentials: true // Важно для работы с куками
+  origin: process.env.CORS_ORIGIN || "http://localhost:8081",
+  credentials: true
 };
 
 app.use(cors(corsOptions));
-app.use(cookieParser()); // Добавляем парсер кук
-
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const db = require("./app/models");
 const Role = db.role;
 
-db.sequelize.sync({force: true}).then(() => {
-  console.log('Drop and Resync Database with { force: true }');
+db.sequelize.sync({ force: false }).then(() => {
+  console.log('Database synced');
   initial();
+}).catch(err => {
+  console.log('Failed to sync db: ' + err.message);
 });
 
 app.get("/", (req, res) => {
-  res.json({ message: "Test lab 4! Hybrid Auth" });
+  res.json({ 
+    message: "JWT Auth API is running!",
+    environment: process.env.NODE_ENV || 'development'
+  });
 });
 
 require('./app/routes/auth.routes')(app);
@@ -36,12 +40,12 @@ app.listen(PORT, () => {
 });
 
 function initial() {
-  Role.create({
-    id: 1,
-    name: "user"
+  Role.findOrCreate({
+    where: { id: 1 },
+    defaults: { name: "user" }
   });
-  Role.create({
-    id: 2,
-    name: "admin"
+  Role.findOrCreate({
+    where: { id: 2 },
+    defaults: { name: "admin" }
   });
 }

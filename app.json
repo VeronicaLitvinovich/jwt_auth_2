@@ -1,0 +1,5 @@
+{
+  "name": "JWT Auth API",
+  "description": "JWT Authentication API",
+  "keywords": ["node", "express", "jwt", "postgresql"]
+}

@@ -4,7 +4,14 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node server.js", 
+    "test": "jest --verbose --coverage",
+    "test:unit": "jest test/unit --verbose",
+    "test:integration": "jest test/integration --verbose --forceExit",
+    "test:watch": "jest --watch",
+    "build": "npm run test",
+    "setup-db": "node scripts/setup-db.js"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +28,9 @@
     "pg": "^8.16.3",
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.7"
+  },
+  "devDependencies": {
+    "jest": "^30.2.0",
+    "supertest": "^7.1.4"
   }
 }
-

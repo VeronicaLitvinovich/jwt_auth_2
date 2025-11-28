@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: test_admin
+      POSTGRES_PASSWORD: test_1234
+      POSTGRES_DB: test_lab4_1
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile.prod
+    environment:
+      NODE_ENV: production
+      DB_HOST: db
+      DB_USER: test_admin
+      DB_PASSWORD: test_1234
+      DB_NAME: test_lab4_1
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
